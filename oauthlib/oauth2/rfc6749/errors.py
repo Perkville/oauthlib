@@ -14,6 +14,7 @@ from oauthlib.common import urlencode, add_params_to_uri
 class OAuth2Error(Exception):
     error = None
     status_code = 400
+    description = None
 
     def __init__(self, description=None, uri=None, state=None, status_code=None,
                  request=None):
@@ -36,7 +37,8 @@ class OAuth2Error(Exception):
 
         request:  Oauthlib Request object
         """
-        self.description = description
+        if description is not None:
+            self.description = description
         self.uri = uri
         self.state = state
 
@@ -49,6 +51,21 @@ class OAuth2Error(Exception):
             self.scopes = request.scopes
             self.response_type = request.response_type
             self.grant_type = request.grant_type
+
+    @property
+    def json(self):
+        error_dict = {
+            'error_type': u'oauth_error',
+            'errors': {
+                '__all__': [
+                    {
+                        'code': self.error if self.error is not None else "unknown",
+                        'message': self.description if self.description is not None else "",
+                    }
+                ]
+            }
+        }
+        return json.dumps(error_dict)
 
     def in_uri(self, uri):
         return add_params_to_uri(uri, self.twotuples)
@@ -67,10 +84,6 @@ class OAuth2Error(Exception):
     @property
     def urlencoded(self):
         return urlencode(self.twotuples)
-
-    @property
-    def json(self):
-        return json.dumps(dict(self.twotuples))
 
 
 class TokenExpiredError(OAuth2Error):
@@ -216,6 +229,8 @@ class UnsupportedGrantTypeError(OAuth2Error):
     server.
     """
     error = 'unsupported_grant_type'
+    description = 'This grant type is unsupported (You probably have a typo ' \
+                  'in the "grant_type" field)'
 
 
 class UnsupportedTokenTypeError(OAuth2Error):
